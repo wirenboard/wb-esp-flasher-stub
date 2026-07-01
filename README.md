@@ -1,3 +1,27 @@
+# Wiren Board fork
+
+This is a fork of `esp-flasher-stub` made while speeding up ESP32 production flashing on the
+Wiren Board test stand (the module is flashed over a built-in CH343 USB-UART bridge). It adds the
+changes below on top of upstream; each is described here. The upstream README follows further down.
+
+## 1. UART clock/APB boost on ESP32
+
+Upstream raises the CPU/APB clock (`stub_lib_clock_init()`, APB 40 → 80 MHz) **only for USB
+transports**; over a plain UART the stub keeps running at the ROM download clock, which throttles
+flash writes. The gate exists because the ESP32-S3 UART path was unstable without setting DBIAS.
+
+The ESP32 target's `stub_target_clock_init()` **does** set DBIAS (`RTC_CNTL_DBIAS_1V25`), so the
+boost is safe for UART there. We enable it for UART, **gated to esp32 only** — via an `ESP32`
+compile macro defined by the build for `TARGET_CHIP=esp32` (same style as the existing `ESP8266`
+macro); every other target keeps upstream USB-only behaviour. Boosting the APB changes the ROM-set
+UART baud divider, so the divider is reprogrammed for the current link baud (115200) right after
+the boost, otherwise the `OHAI` handshake is corrupted. Measured ~+12–17% flash-write throughput
+on ESP32-U4WDH over a CH343 USB-UART.
+
+<!-- wb-fork-notes-end -->
+
+---
+
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/espressif/esp-flasher-stub/master.svg)](https://results.pre-commit.ci/latest/github/espressif/esp-flasher-stub/master)
 
 # ESP Flasher Stub
