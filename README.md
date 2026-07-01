@@ -29,7 +29,9 @@ all-`0xFF`**. Heuristic: after the first non-blank sector is seen, it erases the
 unconditionally without reading — a used chip is dirty from its low addresses (bootloader), so the
 wasted reads are ~one sector, while a factory-blank chip skips *all* erases. Correctness is
 guaranteed: a sector is only left un-erased when it has been verified blank. This is plain NOR
-logic (independent of the CPU), so it is enabled for **all** targets. Measured on ESP32-U4WDH:
+logic (independent of the CPU), so it is enabled on every target **except ESP8266**, whose tiny
+IRAM/DRAM cannot fit the 4 KB sector read buffer and blank-check code — it keeps upstream's
+unconditional erase. Measured on ESP32-U4WDH:
 writing a 1.77 MB image to a blank chip drops from 13.0 s to 7.6 s (−5.3 s); a dirty chip erases
 as before with no penalty; the hash is verified in both cases.
 
@@ -37,10 +39,37 @@ as before with no penalty; the hash is verified in both cases.
 
 `FRAME_BUFFER_SIZE` is raised from 16 KB to 32 KB so esptool can send larger `FLASH_DEFL_DATA`
 chunks (run esptool with `FLASH_WRITE_SIZE=0x8000`), halving the number of per-block round-trips.
-This is chip-independent; the only constraint is that the receive double buffer must fit the
-stub's DRAM window. For esp32 the window in `ld/esp32.ld` is widened to hold the 2×32 KB double
-buffer (`org 0x3ffc3000, len 0x1D000` = 116 KB; the stub's `.bss` is ~111 KB and ends just under
-the safe top `0x3ffe0000`).
+The double buffer (2×32 KB) lives in `.bss`, so **every chip's** DRAM window is widened to hold it
+(to `len 0x1D000` = 116 KB, mirroring esp32). Each `ld/<chip>.ld` also gains a link-time `ASSERT`
+that the window stays below the chip's ROM data/stack, so an unsafe window **fails the build**
+instead of silently corrupting RAM at runtime. **ESP8266 keeps the 16 KB block** — its ~80 KB DRAM
+cannot hold a 2×32 KB double buffer. Verified in CI: all 14 chips build.
+
+## Using the prebuilt stub
+
+CI builds every chip on each push and publishes the JSON stubs to the rolling
+[`latest`](https://github.com/wirenboard/wb-esp-flasher-stub/releases/tag/latest) release, so you
+can use the faster stub without building it. Download the JSON for your chip and copy it over the
+one esptool ships with:
+
+```sh
+# 1. Download the stub for your chip (esp32 shown; any released chip works)
+curl -LO https://github.com/wirenboard/wb-esp-flasher-stub/releases/download/latest/esp32.json
+
+# 2. Copy it into your esptool install (base path auto-detected from the installed esptool;
+#    adjust the trailing "1" to your esptool's stub-version dir if different)
+STUB_DIR="$(python -c "import esptool, os; print(os.path.join(os.path.dirname(esptool.__file__), 'targets', 'stub_flasher', '1'))")"
+cp esp32.json "$STUB_DIR/"
+```
+
+Or grab every chip at once with the GitHub CLI:
+
+```sh
+gh release download latest --repo wirenboard/wb-esp-flasher-stub --pattern '*.json' --dir "$STUB_DIR"
+```
+
+The clock boost and skip-erase speedups then apply automatically. The 32 KB block additionally
+requires esptool to send 32 KB chunks (raise its `FLASH_WRITE_SIZE` to `0x8000`).
 
 <!-- wb-fork-notes-end -->
 
