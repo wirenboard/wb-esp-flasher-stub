@@ -18,6 +18,21 @@ UART baud divider, so the divider is reprogrammed for the current link baud (115
 the boost, otherwise the `OHAI` handshake is corrupted. Measured ~+12–17% flash-write throughput
 on ESP32-U4WDH over a CH343 USB-UART.
 
+## 2. Skip erase on already-blank sectors
+
+`write_flash` always erases the target region before programming. On a factory-blank chip
+(all `0xFF`) that erase is the single largest cost of a flash and is redundant: NOR program only
+clears `1 → 0` bits, so any data can be written straight onto erased (`0xFF`) flash.
+
+The stub now reads each sector before erasing it and **skips the erase when the sector is already
+all-`0xFF`**. Heuristic: after the first non-blank sector is seen, it erases the rest
+unconditionally without reading — a used chip is dirty from its low addresses (bootloader), so the
+wasted reads are ~one sector, while a factory-blank chip skips *all* erases. Correctness is
+guaranteed: a sector is only left un-erased when it has been verified blank. This is plain NOR
+logic (independent of the CPU), so it is enabled for **all** targets. Measured on ESP32-U4WDH:
+writing a 1.77 MB image to a blank chip drops from 13.0 s to 7.6 s (−5.3 s); a dirty chip erases
+as before with no penalty; the hash is verified in both cases.
+
 <!-- wb-fork-notes-end -->
 
 ---
