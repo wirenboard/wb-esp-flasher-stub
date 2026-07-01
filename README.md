@@ -33,6 +33,15 @@ logic (independent of the CPU), so it is enabled for **all** targets. Measured o
 writing a 1.77 MB image to a blank chip drops from 13.0 s to 7.6 s (−5.3 s); a dirty chip erases
 as before with no penalty; the hash is verified in both cases.
 
+## 3. 32 KB flash write block
+
+`FRAME_BUFFER_SIZE` is raised from 16 KB to 32 KB so esptool can send larger `FLASH_DEFL_DATA`
+chunks (run esptool with `FLASH_WRITE_SIZE=0x8000`), halving the number of per-block round-trips.
+This is chip-independent; the only constraint is that the receive double buffer must fit the
+stub's DRAM window. For esp32 the window in `ld/esp32.ld` is widened to hold the 2×32 KB double
+buffer (`org 0x3ffc3000, len 0x1D000` = 116 KB; the stub's `.bss` is ~111 KB and ends just under
+the safe top `0x3ffe0000`).
+
 <!-- wb-fork-notes-end -->
 
 ---

@@ -14,8 +14,10 @@
 extern "C" {
 #endif
 
-/* Maximum frame size: 8-byte SLIP header + esptool max data payload (WRITE_FLASH uses 0x4000+0xFF). */
-#define FRAME_BUFFER_SIZE (8U + 0x4000U + 0xFFU)
+/* Maximum frame size: 8-byte SLIP header + esptool max data payload + SLIP slack.
+ * Flash block enlarged to 32KB (fewer round-trips); run esptool with FLASH_WRITE_SIZE=0x8000
+ * to match. The double buffer must fit the stub's DRAM window (see the target linker script). */
+#define FRAME_BUFFER_SIZE (8U + 0x8000U + 0xFFU)
 
 enum frame_buffer_state {
     FRAME_BUFFER_STATE_IDLE,
