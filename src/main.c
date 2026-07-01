@@ -52,7 +52,7 @@ void esp_main(void)
     }
 #else
     if (transport == TRANSPORT_USB_OTG || transport == TRANSPORT_USB_SERIAL_JTAG ||
-        transport == TRANSPORT_SDIO) {
+            transport == TRANSPORT_SDIO) {
         stub_lib_clock_init();
     }
 #endif

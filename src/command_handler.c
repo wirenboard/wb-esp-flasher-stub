@@ -203,7 +203,7 @@ static int s_conditional_erase_next(void)
         }
         if (blank) {
             uint32_t step = (s_flash_state.erase_remaining < config.sector_size)
-                                ? s_flash_state.erase_remaining : config.sector_size;
+                            ? s_flash_state.erase_remaining : config.sector_size;
             s_flash_state.next_erase_addr += config.sector_size;
             s_flash_state.erase_remaining -= step;
             return RESPONSE_SUCCESS;
