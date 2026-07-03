@@ -21,6 +21,11 @@ __asm__(
     "esp_main_esp8266:\n"
     "movi a0, 0x400010a8;"
     "j esp_main;");
+
+/* esp_main is only referenced from the top-level asm entry stub above, which is
+ * opaque to LTO; keep the symbol alive and externally visible so whole-program
+ * optimization does not internalize or drop it. */
+void esp_main(void) __attribute__((used, externally_visible));
 #endif //ESP8266
 
 void esp_main(void)
