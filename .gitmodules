@@ -1,6 +1,6 @@
 [submodule "esp-stub-lib"]
 	path = esp-stub-lib
-	url = https://github.com/espressif/esp-stub-lib
+	url = https://github.com/wirenboard/wb-esp-stub-lib.git
 	shallow = true
 [submodule "unittests/CMock"]
 	path = unittests/CMock
