@@ -12,6 +12,13 @@ add_executable(${TARGET_NAME}
 # USB-only clock behaviour. The conditional erase and larger flash block are chip-independent.
 if(TARGET_CHIP STREQUAL "esp32")
     target_compile_definitions(${TARGET_NAME} PRIVATE ESP32)
+    # ESP32 fast write: 64-byte hardware page-program + cold flash-attach via efuse pins.
+    # Strong overrides of the weak esp-stub-lib defaults; esp32-only (uses SPI1 registers).
+    target_sources(${TARGET_NAME} PRIVATE "esp32_fast_write.c")
+    # soc/spi_reg.h includes <bit_utils.h> unprefixed; add the inner esp-stub-lib include dir
+    # so that resolves (same as how esp-stub-lib compiles its own target sources).
+    target_include_directories(${TARGET_NAME} PRIVATE
+        ${CMAKE_SOURCE_DIR}/esp-stub-lib/include/esp-stub-lib)
 endif()
 
 target_link_options(${TARGET_NAME} PRIVATE

@@ -35,6 +35,23 @@ unconditional erase. Measured on ESP32-U4WDH:
 writing a 1.77 MB image to a blank chip drops from 13.0 s to 7.6 s (−5.3 s); a dirty chip erases
 as before with no penalty; the hash is verified in both cases.
 
+## 4. 64-byte hardware page-program on ESP32
+
+The default `stub_target_flash_write_buff()` writes via ROM `esp_rom_spiflash_write()`, which
+programs the flash in 32-byte bursts. IDF's `esp_flash` driver programs in 64-byte bursts
+(`SPI_FLASH_HAL_MAX_WRITE_BYTES`), halving the number of hardware page-program commands per
+256-byte flash page.
+
+We override the write path for **esp32 only** (`src/esp32_fast_write.c`, a strong override of the
+weak esp-stub-lib default) to drive the SPI1 controller's hardware Page-Program command
+(`SPI_FLASH_PP`, opcode `0x02`) directly — 64 bytes per transaction, mirroring IDF's
+`spi_flash_hal_program_page()`. A write-in-progress (WIP) wait before the first PP prevents its
+first 64 bytes from being dropped: `flash_defl_begin` can ACK the region erase while the flash WIP
+bit is still set, so the first PP would otherwise fire into a busy flash (leaving the first 64
+bytes at `0xFF` and failing the hash). Flash attach uses the stock esp-stub-lib flow unchanged, and
+the submodule is left untouched. Measured on ESP32-U4WDH + XM25QH32C: program-only write rate +6%
+(278 → 294 KB/s at CPU 80 MHz), matching the on-device `esp_flash` driver.
+
 ## 3. 32 KB flash write block
 
 `FRAME_BUFFER_SIZE` is raised from 16 KB to 32 KB so esptool can send larger `FLASH_DEFL_DATA`
@@ -68,8 +85,8 @@ Or grab every chip at once with the GitHub CLI:
 gh release download latest --repo wirenboard/wb-esp-flasher-stub --pattern '*.json' --dir "$STUB_DIR"
 ```
 
-The clock boost and skip-erase speedups then apply automatically. The 32 KB block additionally
-requires esptool to send 32 KB chunks (raise its `FLASH_WRITE_SIZE` to `0x8000`).
+The clock boost, skip-erase, and 64-byte page-program speedups then apply automatically. The 32 KB
+block additionally requires esptool to send 32 KB chunks (raise its `FLASH_WRITE_SIZE` to `0x8000`).
 
 <!-- wb-fork-notes-end -->
 
