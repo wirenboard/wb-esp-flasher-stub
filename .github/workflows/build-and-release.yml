@@ -67,7 +67,10 @@ jobs:
   release:
     name: Publish release
     needs: build_stubs
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    if: >-
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -91,8 +94,23 @@ jobs:
           files: |
             stub-jsons/**/esp*.json
 
+      # Rolling "latest" prerelease: refreshed on every push to master and on manual
+      # dispatch. Delete the previous release+tag first so the `latest` tag is recreated
+      # pointing at the new commit (softprops does not move an already-existing tag).
+      - name: Remove previous rolling latest
+        if: >-
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event_name == 'push' && github.ref == 'refs/heads/master')) &&
+          !startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete latest --repo "${{ github.repository }}" --yes --cleanup-tag || true
+
       - name: Publish rolling latest prerelease
-        if: github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/')
+        if: >-
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event_name == 'push' && github.ref == 'refs/heads/master')) &&
+          !startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
